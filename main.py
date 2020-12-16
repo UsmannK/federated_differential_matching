@@ -133,49 +133,10 @@ def train(models, args, net_dataidx_map):
             avg_loss = sum(cur_params['epoch_losses']) / len(cur_params['epoch_losses'])
             pbar.set_description(f'[Epoch {cur_params["epoch"]}/{args.epochs}]  Model {model_id} Loss: {avg_loss:.5f}')
 
-
-
-
-    # for epoch in range(args.epochs):
-    #     # Set up TQDM bars:
-    #     train_iterators = {}
-    #     for m_id, val in params.items():
-    #         progress_bars[m_id].reset()
-    #         progress_bars[m_id].total = len(val['train_dl'])
-    #         train_iterators[m_id] = iter(val['train_dl'])
-
-    #     cur_epoch_losses = {model_id:[] for model_id in params}
-    #     model_advanced = True
-    #     while model_advanced:
-    #         model_advanced = False
-    #         # Train models in parallel
-    #         for model_id in train_iterators:
-    #             try:
-    #                 iterator = train_iterators[model_id]
-    #                 pbar = progress_bars[model_id]
-    #                 x, target = next(iterator)
-    #                 x, target = x.to(device), target.to(device)
-    #                 pbar.update(1)
-    #                 model_advanced = True
-    #             except StopIteration:
-    #                 continue
-    #             cur_params = params[model_id]
-    #             optimizer = cur_params['optimizer']
-    #             optimizer.zero_grad()
-    #             out = cur_params['model'](x)
-    #             loss = criterion(out, target)
-    #             loss.backward()
-    #             optimizer.step()
-
-    #             cur_epoch_losses[model_id].append(loss)
-    #             avg_loss = sum(cur_epoch_losses[model_id]) / len(cur_epoch_losses[model_id])
-    #             pbar.set_description(f'[Epoch {epoch+1}/{args.epochs}]  Model {model_id} Loss: {avg_loss:.5f}')
-    #     for model_id, losses in cur_epoch_losses.items():
-    #         all_epoch_losses[model_id].append(sum(losses)/len(losses))
     for model_id in params:
         progress_bars[model_id].close()
-
     sys.stderr.flush()
+    
     train_accs, test_accs = [], []
     for model_id in params:
         cur_params = params[model_id]
