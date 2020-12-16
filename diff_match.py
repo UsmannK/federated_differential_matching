@@ -62,7 +62,7 @@ def compute_diff_matching(weights, layer_idx, args):
     return matched_weights, pi_li
 
 def get_matched_weights(cur_weights, layer_idx, args):
-    device = torch.device("cuda:0") if torch.cuda.is_available() else torch.device("cpu")
+    device = torch.device(0) if torch.cuda.is_available() else torch.device("cpu")
     layer_weights = torch.stack(cur_weights)
     best_loss = None
     num_model = layer_weights.shape[0]
