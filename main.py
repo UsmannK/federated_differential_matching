@@ -187,8 +187,9 @@ def main(args):
     # Diff Matching
     batch_weights = diff_match.prepare_weights(models)
     n_layers = len(batch_weights[0])
-    # Loop over model layers, except for final weights and bias
-    for layer_idx in range(n_layers-2):
+    # Loop over model layers
+    max_matching_layer = n_layers if args.match_all_layers else n_layers-2
+    for layer_idx in range(max_matching_layer):
         logging.debug('*'*50)
         logging.debug(f'>> Layer {layer_idx+1} / {n_layers} <<')
         # Matching algo
@@ -216,10 +217,13 @@ def main(args):
             eval_model(models)
         # Get newly trained weights
         batch_weights = diff_match.prepare_weights(models)
-    # For final layer+bias, take weighted average of local models
-    new_weights, new_biases = utils.compute_weighted_avg_of_weights(batch_weights, traindata_cls_counts)
-    global_weights[n_layers-2] = new_weights
-    global_weights[n_layers-1] = new_biases
+        
+    if not args.match_all_layers:
+        # For final layer+bias, take weighted average of local models
+        new_weights, new_biases = utils.compute_weighted_avg_of_weights(batch_weights, traindata_cls_counts)
+        global_weights[n_layers-2] = new_weights
+        global_weights[n_layers-1] = new_biases
+
     global_model = model_zoo.get_model(args)
     for layer_idx in global_weights:
         utils.set_params(global_model, global_weights[layer_idx], layer_idx)
