@@ -133,3 +133,4 @@ logs/
 *.pt
 .data
 *ipynb
+.vscode
