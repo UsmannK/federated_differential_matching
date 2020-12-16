@@ -56,7 +56,7 @@ def train(models, args, net_dataidx_map):
     num_gpus = torch.cuda.device_count()
     mode = GPU if (num_gpus > 0 and torch.cuda.is_available) else CPU
     logging.debug(f'Training on {mode}')
-    conditional_log(mode == GPU, '{num_gpus} GPUs available')
+    conditional_log(mode == GPU, f'{num_gpus} GPUs available')
 
     params = {}
 
