@@ -89,7 +89,6 @@ def train(models, args, net_dataidx_map):
             'epoch': 1,
             'epoch_losses': [],
             'criterion': nn.CrossEntropyLoss().to(device),
-            'device': device
         }
         model.to(device)
         model.train()
