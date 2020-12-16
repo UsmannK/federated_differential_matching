@@ -64,7 +64,7 @@ def setup_logging(args):
     logging.basicConfig(
         filename = Path(args.logdir) / 'experiment_log.log',
         format = '%(asctime)s %(levelname)-8s %(message)s',
-        datefmt = '%m-%d %H:%M', level=logging.DEBUG, filemode='w')
+        datefmt = '%m-%d %H:%M:%S', level=logging.DEBUG, filemode='w')
     if args.log_stderr:
         logging.getLogger().addHandler(logging.StreamHandler())
 
