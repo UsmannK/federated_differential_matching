@@ -76,7 +76,7 @@ def train(models, args, net_dataidx_map):
         if mode == GPU:
             gpu_id = model_id % num_gpus
             device = torch.device(gpu_id)
-            logging.debug('GPU {gpu_id}')
+            logging.debug(f'GPU {gpu_id}')
         else:
             device = torch.device('cpu')
 
