@@ -87,12 +87,13 @@ def train(models, args, net_dataidx_map):
             'device': device,
             'optimizer': optim.SGD(model.parameters(), lr=args.lr, momentum=0.9),
             'epoch': 1,
-            'epoch_losses': []
+            'epoch_losses': [],
+            'criterion': nn.CrossEntropyLoss().to(device),
+            'device': device
         }
         model.to(device)
         model.train()
 
-    criterion = nn.CrossEntropyLoss().to(device)
     all_epoch_losses = {model_id:[] for model_id in params}
     progress_bars = {model_id: tqdm() for model_id in params}
     train_iterators = {model_id: iter(cur_params['train_dl']) for model_id,cur_params in params.items()}
@@ -108,7 +109,7 @@ def train(models, args, net_dataidx_map):
                 iterator = train_iterators[model_id]
                 pbar = progress_bars[model_id]
                 x, target = next(iterator)
-                x, target = x.to(device), target.to(device)
+                x, target = x.to(cur_params['device']), target.to(cur_params['device'])
                 pbar.update(1)
                 keep_training = True
             except StopIteration:
@@ -125,7 +126,7 @@ def train(models, args, net_dataidx_map):
             optimizer = cur_params['optimizer']
             optimizer.zero_grad()
             out = cur_params['model'](x)
-            loss = criterion(out, target)
+            loss = cur_params['criterion'](out, target)
             loss.backward()
             optimizer.step()
 
