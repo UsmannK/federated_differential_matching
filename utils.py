@@ -91,8 +91,8 @@ def set_params(models, new_weights, layer_idx):
         model.load_state_dict(statedict)
 
 def permute_params(models, pi_li, layer_idx, args):
+    statedict = models[0].state_dict()
     if args.skip_bias_match:
-        statedict = models[0].state_dict()
         bias_key = list(statedict.keys())[layer_idx+1]
         cur_biases = [model.state_dict()[bias_key].detach() for model in models]
         cur_biases = torch.stack([bias.unsqueeze(0) for bias in cur_biases])
