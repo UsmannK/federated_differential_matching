@@ -89,6 +89,7 @@ def train(models, args, net_dataidx_map):
             'epoch': 1,
             'epoch_losses': [],
             'criterion': nn.CrossEntropyLoss().to(device),
+            'training': True
         }
         model.to(device)
         model.train()
@@ -108,14 +109,16 @@ def train(models, args, net_dataidx_map):
                 iterator = train_iterators[model_id]
                 x, target = next(iterator)
             except StopIteration:
-                all_epoch_losses[model_id].append(sum(cur_params['epoch_losses']) / len(cur_params['epoch_losses']))
-                if cur_params['epoch'] < args.epochs:
+                if cur_params['training']:
+                    all_epoch_losses[model_id].append(sum(cur_params['epoch_losses']) / len(cur_params['epoch_losses']))
+                elif cur_params['epoch'] < args.epochs:
                     cur_params['epoch'] = cur_params['epoch'] + 1
                     progress_bars[model_id].reset()
                     progress_bars[model_id].total = len(cur_params['train_dl'])
                     train_iterators[model_id] = iter(cur_params['train_dl'])
                     cur_params['epoch_losses'] = []
-                    keep_training = True
+                else:
+                    cur_params['training'] = False
             else:
                 x, target = x.to(cur_params['device']), target.to(cur_params['device'])
                 optimizer = cur_params['optimizer']
@@ -127,53 +130,16 @@ def train(models, args, net_dataidx_map):
 
                 cur_params['epoch_losses'].append(loss)
                 avg_loss = sum(cur_params['epoch_losses']) / len(cur_params['epoch_losses'])
-                keep_training = True
 
                 pbar = progress_bars[model_id]
                 pbar.update(1)
                 pbar.set_description(f'[Epoch {cur_params["epoch"]}/{args.epochs}]  Model {model_id} Loss: {avg_loss:.5f}')
-
-
-    # for epoch in range(args.epochs):
-    #     # Set up TQDM bars:
-    #     train_iterators = {}
-    #     for m_id, val in params.items():
-    #         progress_bars[m_id].reset()
-    #         progress_bars[m_id].total = len(val['train_dl'])
-    #         train_iterators[m_id] = iter(val['train_dl'])
-
-    #     cur_epoch_losses = {model_id:[] for model_id in params}
-    #     model_advanced = True
-    #     while model_advanced:
-    #         model_advanced = False
-    #         # Train models in parallel
-    #         for model_id in train_iterators:
-    #             try:
-    #                 iterator = train_iterators[model_id]
-    #                 pbar = progress_bars[model_id]
-    #                 x, target = next(iterator)
-    #                 x, target = x.to(device), target.to(device)
-    #                 pbar.update(1)
-    #                 model_advanced = True
-    #             except StopIteration:
-    #                 continue
-    #             cur_params = params[model_id]
-    #             optimizer = cur_params['optimizer']
-    #             optimizer.zero_grad()
-    #             out = cur_params['model'](x)
-    #             loss = criterion(out, target)
-    #             loss.backward()
-    #             optimizer.step()
-
-    #             cur_epoch_losses[model_id].append(loss)
-    #             avg_loss = sum(cur_epoch_losses[model_id]) / len(cur_epoch_losses[model_id])
-    #             pbar.set_description(f'[Epoch {epoch+1}/{args.epochs}]  Model {model_id} Loss: {avg_loss:.5f}')
-    #     for model_id, losses in cur_epoch_losses.items():
-    #         all_epoch_losses[model_id].append(sum(losses)/len(losses))
+            finally:
+                keep_training = keep_training or cur_params['training']
     for model_id in params:
         progress_bars[model_id].close()
-
     sys.stderr.flush()
+    
     train_accs, test_accs = [], []
     for model_id in params:
         cur_params = params[model_id]
@@ -224,8 +190,12 @@ def main(args):
     # Diff Matching
     batch_weights = diff_match.prepare_weights(models)
     n_layers = len(batch_weights[0])
-    # Loop over model layers, except for final weights and bias
-    for layer_idx in range(n_layers-2):
+    # Loop over model layers
+    max_matching_layer = n_layers if args.match_all_layers else n_layers-2
+    for layer_idx in range(max_matching_layer):
+        if args.skip_bias_match:
+            if layer_idx % 2 == 1:
+                continue
         logging.debug('*'*50)
         logging.debug(f'>> Layer {layer_idx+1} / {n_layers} <<')
         # Matching algo
@@ -234,12 +204,13 @@ def main(args):
         utils.set_params(models, new_weights, layer_idx)
         # Permute next layer
         if layer_idx < n_layers-1:
-            utils.permute_params(models, pi_li, layer_idx)
+            utils.permute_params(models, pi_li, layer_idx, args)
         if not args.skip_training:
             # Freeze layers
+            freeze_idx = layer_idx+1 if args.skip_bias_match else layer_idx
             for model in models:
                 for param_idx, param in enumerate(model.parameters()):
-                    if param_idx <= layer_idx:
+                    if param_idx <= freeze_idx:
                         param.requires_grad=False
             # Retrain local models
             cur_train_accs, cur_test_accs = train(models, args, net_dataidx_map)
@@ -253,10 +224,13 @@ def main(args):
             eval_model(models)
         # Get newly trained weights
         batch_weights = diff_match.prepare_weights(models)
-    # For final layer+bias, take weighted average of local models
-    new_weights, new_biases = utils.compute_weighted_avg_of_weights(batch_weights, traindata_cls_counts)
-    global_weights[n_layers-2] = new_weights
-    global_weights[n_layers-1] = new_biases
+        
+    if not args.match_all_layers:
+        # For final layer+bias, take weighted average of local models
+        new_weights, new_biases = utils.compute_weighted_avg_of_weights(batch_weights, traindata_cls_counts)
+        global_weights[n_layers-2] = new_weights
+        global_weights[n_layers-1] = new_biases
+
     global_model = model_zoo.get_model(args)
     for layer_idx in global_weights:
         utils.set_params(global_model, global_weights[layer_idx], layer_idx)

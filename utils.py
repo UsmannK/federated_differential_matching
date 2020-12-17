@@ -26,6 +26,8 @@ def get_parser():
     parser.add_argument('--partition', type=str, required=True, help="Partition = homo/hetero/hetero-dir")
     parser.add_argument('--alpha', type=float, required=False, default=0.5, help="Dirichlet distribution constant used for data partitioning")
     parser.add_argument('--diff_match_epochs', type=int, required=False, default=20_000, help="Epochs for differentiable method")
+    parser.add_argument('--match_all_layers', action="store_true", help="Match final layers instead of weighted avg")
+    parser.add_argument('--skip_bias_match', action="store_true", help="Use weight matrices for bias transformation")
 
     parser.add_argument('--load_pretrained_models', action="store_true", help="Load saved initial models")
 
@@ -88,20 +90,30 @@ def set_params(models, new_weights, layer_idx):
         statedict[weight_key] = new_weights.squeeze()
         model.load_state_dict(statedict)
 
-def permute_params(models, pi_li, layer_idx):
-    for idx, model in enumerate(models):
-        statedict = model.state_dict()
-        weight_key = list(statedict.keys())[layer_idx+1]
-        cur_weight = statedict[weight_key].detach()
-        if 'conv' in weight_key:
-            #TODO: debug over this
-            cur_weight = cur_weight.permute(1,2,3,0)
-            original_shape = cur_weight.shape
-            cur_weight = cur_weight.reshape(cur_weight.shape[0],-1)
-            statedict[weight_key] = (pi_li[idx].T @ cur_weight).reshape(original_shape).permute(3,0,1,2)
-        else:
-            statedict[weight_key] = (pi_li[idx].T @ cur_weight.T).T
-        model.load_state_dict(statedict)
+def permute_params(models, pi_li, layer_idx, args):
+    if args.skip_bias_match:
+        statedict = models[0].state_dict()
+        bias_key = list(statedict.keys())[layer_idx+1]
+        cur_biases = [model.state_dict()[bias_key].detach() for model in models]
+        cur_biases = torch.stack([bias.unsqueeze(0) for bias in cur_biases])
+        new_biases = torch.sum(torch.matmul(cur_biases, pi_li),axis=0) / len(models)
+        set_params(models, new_biases, layer_idx+1)
+        layer_idx += 1
+    # If there's a next weight to permute then do so
+    if len(statedict) > layer_idx+1:
+        for idx, model in enumerate(models):
+            statedict = model.state_dict()
+            weight_key = list(statedict.keys())[layer_idx+1]
+            cur_weight = statedict[weight_key].detach()
+            if 'conv' in weight_key:
+                #TODO: debug over this
+                cur_weight = cur_weight.permute(1,2,3,0)
+                original_shape = cur_weight.shape
+                cur_weight = cur_weight.reshape(cur_weight.shape[0],-1)
+                statedict[weight_key] = (pi_li[idx].T @ cur_weight).reshape(original_shape).permute(3,0,1,2)
+            else:
+                statedict[weight_key] = (pi_li[idx].T @ cur_weight.T).T
+            model.load_state_dict(statedict)
 
 def compute_weighted_avg_of_weights(batch_weights, traindata_cls_counts):
     n_models = len(traindata_cls_counts)
