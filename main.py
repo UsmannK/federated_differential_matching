@@ -106,11 +106,7 @@ def train(models, args, net_dataidx_map):
         for model_id, cur_params in params.items():
             try:
                 iterator = train_iterators[model_id]
-                pbar = progress_bars[model_id]
                 x, target = next(iterator)
-                x, target = x.to(cur_params['device']), target.to(cur_params['device'])
-                pbar.update(1)
-                keep_training = True
             except StopIteration:
                 all_epoch_losses[model_id].append(sum(cur_params['epoch_losses']) / len(cur_params['epoch_losses']))
                 if cur_params['epoch'] < args.epochs:
@@ -120,20 +116,22 @@ def train(models, args, net_dataidx_map):
                     train_iterators[model_id] = iter(cur_params['train_dl'])
                     cur_params['epoch_losses'] = []
                     keep_training = True
-                else:
-                    continue
-            optimizer = cur_params['optimizer']
-            optimizer.zero_grad()
-            out = cur_params['model'](x)
-            loss = cur_params['criterion'](out, target)
-            loss.backward()
-            optimizer.step()
+            else:
+                x, target = x.to(cur_params['device']), target.to(cur_params['device'])
+                optimizer = cur_params['optimizer']
+                optimizer.zero_grad()
+                out = cur_params['model'](x)
+                loss = cur_params['criterion'](out, target)
+                loss.backward()
+                optimizer.step()
 
-            cur_params['epoch_losses'].append(loss)
-            avg_loss = sum(cur_params['epoch_losses']) / len(cur_params['epoch_losses'])
-            pbar.set_description(f'[Epoch {cur_params["epoch"]}/{args.epochs}]  Model {model_id} Loss: {avg_loss:.5f}')
+                cur_params['epoch_losses'].append(loss)
+                avg_loss = sum(cur_params['epoch_losses']) / len(cur_params['epoch_losses'])
+                keep_training = True
 
-
+                pbar = progress_bars[model_id]
+                pbar.update(1)
+                pbar.set_description(f'[Epoch {cur_params["epoch"]}/{args.epochs}]  Model {model_id} Loss: {avg_loss:.5f}')
 
 
     # for epoch in range(args.epochs):
