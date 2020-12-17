@@ -111,7 +111,7 @@ def train(models, args, net_dataidx_map):
             except StopIteration:
                 if cur_params['training']:
                     all_epoch_losses[model_id].append(sum(cur_params['epoch_losses']) / len(cur_params['epoch_losses']))
-                elif cur_params['epoch'] < args.epochs:
+                if cur_params['epoch'] < args.epochs:
                     cur_params['epoch'] = cur_params['epoch'] + 1
                     progress_bars[model_id].reset()
                     progress_bars[model_id].total = len(cur_params['train_dl'])
