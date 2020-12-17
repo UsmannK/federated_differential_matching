@@ -190,6 +190,9 @@ def main(args):
     # Loop over model layers
     max_matching_layer = n_layers if args.match_all_layers else n_layers-2
     for layer_idx in range(max_matching_layer):
+        if args.skip_bias_match:
+            if layer_idx % 2 == 1:
+                continue
         logging.debug('*'*50)
         logging.debug(f'>> Layer {layer_idx+1} / {n_layers} <<')
         # Matching algo
@@ -198,12 +201,13 @@ def main(args):
         utils.set_params(models, new_weights, layer_idx)
         # Permute next layer
         if layer_idx < n_layers-1:
-            utils.permute_params(models, pi_li, layer_idx)
+            utils.permute_params(models, pi_li, layer_idx, args)
         if not args.skip_training:
             # Freeze layers
+            freeze_idx = layer_idx+1 if args.skip_bias_match else layer_idx
             for model in models:
                 for param_idx, param in enumerate(model.parameters()):
-                    if param_idx <= layer_idx:
+                    if param_idx <= freeze_idx:
                         param.requires_grad=False
             # Retrain local models
             cur_train_accs, cur_test_accs = train(models, args, net_dataidx_map)
