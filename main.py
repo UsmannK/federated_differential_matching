@@ -63,7 +63,7 @@ def train(models, args, net_dataidx_map):
     for model_id, model in enumerate(models):
         dataidxs = net_dataidx_map[model_id]
         train_dl, test_dl = datasets.get_dataloader(args.dataset, args.datadir,
-            args.batch_size, args.batch_size, dataidxs)
+            args.batch_size, args.batch_size, dataidxs, 1)
         train_acc = compute_accuracy(model, train_dl)
         test_acc = compute_accuracy(model, test_dl)
         logging.debug('')
@@ -220,8 +220,9 @@ def main(args):
             for model_idx, model in enumerate(models):
                 train_accs[model_idx].append(cur_train_accs[model_idx])
                 test_accs[model_idx].append(cur_test_accs[model_idx])
-                if args.dump_intermediate_models:
-                    torch.save(model, model_dump_path/f'local_model_{model_idx}_{layer_idx+1}.pth')
+        for model_idx, model in enumerate(models):
+            if args.dump_intermediate_models:
+                torch.save(model, model_dump_path/f'local_model_{model_idx}_{layer_idx+1}.pth')
         if not args.debug:
             # Eval model perf
             eval_model(models)
