@@ -87,6 +87,8 @@ def set_params(models, new_weights, layer_idx):
     for model in models:
         statedict = model.state_dict()
         weight_key = list(statedict.keys())[layer_idx]
+        if statedict[weight_key].shape != new_weights.shape:
+            new_weights = new_weights.reshape(statedict[weight_key].shape)
         statedict[weight_key] = new_weights.squeeze()
         model.load_state_dict(statedict)
 
@@ -106,13 +108,19 @@ def permute_params(models, pi_li, layer_idx, args):
             weight_key = list(statedict.keys())[layer_idx+1]
             cur_weight = statedict[weight_key].detach()
             if 'conv' in weight_key:
-                #TODO: debug over this
                 cur_weight = cur_weight.permute(1,2,3,0)
                 original_shape = cur_weight.shape
                 cur_weight = cur_weight.reshape(cur_weight.shape[0],-1)
                 statedict[weight_key] = (pi_li[idx].T @ cur_weight).reshape(original_shape).permute(3,0,1,2)
             else:
-                statedict[weight_key] = (pi_li[idx].T @ cur_weight.T).T
+                if pi_li[idx].T.shape[1] != cur_weight.T.shape[0]:
+                    reshaped_cur_weight = cur_weight.T.reshape(pi_li[idx].T.shape[1], -1, cur_weight.T.shape[-1]).permute(1,0,2)
+                    pi_li_augmented = pi_li[idx].T.unsqueeze(0).repeat(reshaped_cur_weight.shape[0],1,1)
+                    permuted_weight = torch.bmm(pi_li_augmented, reshaped_cur_weight)
+                    permuted_weight = permuted_weight.permute(1,0,2).reshape(256*16,512).T
+                else:
+                    permuted_weight = (pi_li[idx].T @ cur_weight.T).T
+                statedict[weight_key] = permuted_weight
             model.load_state_dict(statedict)
 
 def compute_weighted_avg_of_weights(batch_weights, traindata_cls_counts):

@@ -50,9 +50,12 @@ def prepare_weights(models):
         cur_weights = []
         for weight_key, weight in model.state_dict().items():
             if len(weight.shape) == 1:
-                cur_weights.append(weight.unsqueeze(0))
+                cur_weights.append(weight.unsqueeze(0).detach())
+            elif 'conv' in weight_key:
+                weight = weight.reshape(-1, weight.shape[0])
+                cur_weights.append(weight.detach())
             else:
-                cur_weights.append(weight.T)
+                cur_weights.append(weight.T.detach())
         weights.append(cur_weights)
     return weights
 
