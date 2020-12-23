@@ -208,7 +208,7 @@ def main(args):
         # Permute next layer
         if layer_idx < n_layers-1:
             utils.permute_params(models, pi_li, layer_idx, args)
-        if not args.skip_training:
+        if not args.skip_retraining:
             # Freeze layers
             freeze_idx = layer_idx+1 if args.skip_bias_match else layer_idx
             for model in models:

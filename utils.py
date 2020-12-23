@@ -34,7 +34,8 @@ def get_parser():
     # Debugging settings
     parser.add_argument('--debug', action="store_true", help="Debug mode, skips some steps")
     parser.add_argument('--speed_run', action="store_true", help="Super debug mode, skip all learning steps")
-    parser.add_argument('--skip_training', action="store_true", help="Skip model retraining")
+    parser.add_argument('--skip_training', action="store_true", help="Skip initial model training")
+    parser.add_argument('--skip_retraining', action="store_true", help="Skip model retraining")
     parser.add_argument('--log_stderr', action="store_true", help="Print logs to stderr as well as logfile")
     parser.add_argument('--dump_intermediate_models', action="store_true", help="Dump intermediate states for debug")
 
