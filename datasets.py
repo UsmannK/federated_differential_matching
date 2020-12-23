@@ -102,7 +102,7 @@ class CIFAR10_truncated(data.Dataset):
         return len(self.data)
 
 
-def get_dataloader(dataset, datadir, train_bs, test_bs, dataidxs=None):
+def get_dataloader(dataset, datadir, train_bs, test_bs, dataidxs=None, num_train_workers=0):
     if dataset == 'mnist':
         dl_obj = MNIST_truncated
         transform_train = transforms.Compose([
@@ -133,7 +133,7 @@ def get_dataloader(dataset, datadir, train_bs, test_bs, dataidxs=None):
     train_ds = dl_obj(datadir, dataidxs=dataidxs, train=True, transform=transform_train, download=True)
     test_ds = dl_obj(datadir, train=False, transform=transform_test, download=True)
 
-    train_dl = data.DataLoader(dataset=train_ds, batch_size=train_bs, shuffle=True, num_workers=4)
+    train_dl = data.DataLoader(dataset=train_ds, batch_size=train_bs, shuffle=True, num_workers=num_train_workers)
     test_dl = data.DataLoader(dataset=test_ds, batch_size=test_bs, shuffle=False)
 
     return train_dl, test_dl
