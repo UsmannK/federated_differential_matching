@@ -179,13 +179,14 @@ def main(args):
     else:
         logging.debug('Training new models')
         models = [model_zoo.get_model(args) for _ in range(args.n_nets)]
-        cur_train_accs, cur_test_accs = train(models, args, net_dataidx_map)
-        for idx, model in enumerate(models):
-            train_accs[idx].append(cur_train_accs[idx])
-            test_accs[idx].append(cur_test_accs[idx])
-            if args.dump_intermediate_models:
-                model_dump_path = Path(args.logdir).parent
-                torch.save(model, model_dump_path / f'local_model_{idx}_0.pth')
+        if not args.skip_training:
+            cur_train_accs, cur_test_accs = train(models, args, net_dataidx_map)
+            for idx, model in enumerate(models):
+                train_accs[idx].append(cur_train_accs[idx])
+                test_accs[idx].append(cur_test_accs[idx])
+                if args.dump_intermediate_models:
+                    model_dump_path = Path(args.logdir).parent
+                    torch.save(model, model_dump_path / f'local_model_{idx}_0.pth')
 
     # Diff Matching
     batch_weights = diff_match.prepare_weights(models)
@@ -193,11 +194,13 @@ def main(args):
     # Loop over model layers
     max_matching_layer = n_layers if args.match_all_layers else n_layers-2
     for layer_idx in range(max_matching_layer):
-        if args.skip_bias_match:
-            if layer_idx % 2 == 1:
-                continue
         logging.debug('*'*50)
         logging.debug(f'>> Layer {layer_idx+1} / {n_layers} <<')
+        if args.skip_bias_match:
+            if layer_idx % 2 == 1:
+                logging.debug('Skipping bias layer')
+                logging.debug('')
+                continue
         # Matching algo
         new_weights, pi_li = diff_match.compute_diff_matching(batch_weights, layer_idx, args)
         global_weights[layer_idx] = new_weights
@@ -224,6 +227,7 @@ def main(args):
             eval_model(models)
         # Get newly trained weights
         batch_weights = diff_match.prepare_weights(models)
+    logging.debug('Done matching')
         
     if not args.match_all_layers:
         # For final layer+bias, take weighted average of local models
