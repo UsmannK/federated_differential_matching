@@ -63,7 +63,7 @@ def train(models, args, net_dataidx_map):
     for model_id, model in enumerate(models):
         dataidxs = net_dataidx_map[model_id]
         train_dl, test_dl = datasets.get_dataloader(args.dataset, args.datadir,
-            args.batch_size, args.batch_size, dataidxs, 1)
+            args.batch_size, args.batch_size, dataidxs, args.num_train_workers)
         train_acc = compute_accuracy(model, train_dl)
         test_acc = compute_accuracy(model, test_dl)
         logging.debug('')

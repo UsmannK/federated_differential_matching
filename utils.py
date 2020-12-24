@@ -22,6 +22,7 @@ def get_parser():
     parser.add_argument('--lr', type=float, required=True, help="Learning rate")
     parser.add_argument('--epochs', type=int, required=True, help="Epochs")
     parser.add_argument('--batch_size', type=int, required=False, default=64, help="Batch Size")
+    parser.add_argument('--num_train_workers', type=int, required=False, default=0, help="Number of training workers")
 
     parser.add_argument('--partition', type=str, required=True, help="Partition = homo/hetero/hetero-dir")
     parser.add_argument('--alpha', type=float, required=False, default=0.5, help="Dirichlet distribution constant used for data partitioning")
