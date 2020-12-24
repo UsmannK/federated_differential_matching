@@ -98,11 +98,12 @@ def permute_params(models, pi_li, layer_idx, args):
     statedict = models[0].state_dict()
     if args.skip_bias_match:
         bias_key = list(statedict.keys())[layer_idx+1]
-        cur_biases = [model.state_dict()[bias_key].detach() for model in models]
-        cur_biases = torch.stack([bias.unsqueeze(0) for bias in cur_biases])
-        new_biases = torch.sum(torch.matmul(cur_biases, pi_li),axis=0) / len(models)
-        set_params(models, new_biases, layer_idx+1)
-        layer_idx += 1
+        if 'bias' in bias_key:
+            cur_biases = [model.state_dict()[bias_key].detach() for model in models]
+            cur_biases = torch.stack([bias.unsqueeze(0) for bias in cur_biases])
+            new_biases = torch.sum(torch.matmul(cur_biases, pi_li),axis=0) / len(models)
+            set_params(models, new_biases, layer_idx+1)
+            layer_idx += 1
     # If there's a next weight to permute then do so
     if len(statedict) > layer_idx+1:
         for idx, model in enumerate(models):
