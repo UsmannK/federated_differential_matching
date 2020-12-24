@@ -22,7 +22,8 @@ class MatchOneLayer(nn.Module):
     def forward(self, layer_weights):
         # Cost: euclidean distance
         pi_li_2 = self.pi_li ** 2
-        global_layer_weights = (torch.sum(torch.matmul(layer_weights, pi_li_2),axis=0) / self.num_models).detach()
+        transported_layer_weights = torch.matmul(layer_weights, pi_li_2)
+        global_layer_weights = (torch.sum(transported_layer_weights,axis=0) / self.num_models).detach()
         c = torch.cdist(global_layer_weights.T, layer_weights.permute(0,2,1)) #torch.cdist(global_layer_weights, layer_weights) # Get the euclidean distance from theta to local model weights
         # -log of cost
         # log_p = self.log_softmax(c)
