@@ -18,6 +18,7 @@ import utils
 import model_zoo
 import datasets
 import diff_match
+import external_models
 
 def conditional_log(condition, message):
     if condition:
@@ -159,46 +160,21 @@ def train(models, args, net_dataidx_map):
         logging.debug(f'Local Test accuracy: {test_acc}')
     return train_accs, test_accs
 
-def main(args):
-    # Set up data loaders
-    logging.debug('Partitioning data')
-    model_dump_path = Path(args.logdir).parent
-    net_dataidx_map, traindata_cls_counts = datasets.partition_data(
-                    args.dataset, args.datadir, args.logdir, args.partition, args.n_nets, args.alpha)
-    utils.dump(args, json.dumps(net_dataidx_map), 'net_dataidx_map')
+def run_diff_match(args, models, net_dataidx_map, traindata_cls_counts, model_dump_path):
     train_accs = [[] for _ in range(args.n_nets)]
     test_accs = [[] for _ in range(args.n_nets)]
-    global_weights = {}
-
-    if args.load_pretrained_models:
-        logging.debug('Loading pretrained models')
-        models = utils.load_models_from_disk(args)
-        logging.debug('Evaluating pretrained models')
-        if not args.debug:
-            eval_model(models)
-    else:
-        logging.debug('Training new models')
-        models = [model_zoo.get_model(args) for _ in range(args.n_nets)]
-        if not args.skip_training:
-            cur_train_accs, cur_test_accs = train(models, args, net_dataidx_map)
-            for idx, model in enumerate(models):
-                train_accs[idx].append(cur_train_accs[idx])
-                test_accs[idx].append(cur_test_accs[idx])
-                if args.dump_intermediate_models:
-                    model_dump_path = Path(args.logdir).parent
-                    torch.save(model, model_dump_path / f'local_model_{idx}_0.pth')
-
     # Diff Matching
+    global_weights = {}
     batch_weights = diff_match.prepare_weights(models)
     n_layers = len(batch_weights[0])
+    weight_names = list(models[0].state_dict().keys())
     # Loop over model layers
-    max_matching_layer = n_layers if args.match_all_layers else n_layers-2
+    max_matching_layer = n_layers if args.match_all_layers else n_layers-1
     for layer_idx in range(max_matching_layer):
         logging.debug('*'*50)
         logging.debug(f'>> Layer {layer_idx+1} / {n_layers} <<')
-        if args.skip_bias_match:
-            if layer_idx % 2 == 1:
-                logging.debug('Skipping bias layer')
+        if args.skip_bias_match and 'bias' in weight_names[layer_idx]:
+                logging.debug(f'Skipping bias layer: {weight_names[layer_idx]}')
                 logging.debug('')
                 continue
         # Matching algo
@@ -210,7 +186,7 @@ def main(args):
             utils.permute_params(models, pi_li, layer_idx, args)
         if not args.skip_retraining:
             # Freeze layers
-            freeze_idx = layer_idx+1 if args.skip_bias_match else layer_idx
+            freeze_idx = layer_idx+1 if (args.skip_bias_match and 'bias' in weight_names[layer_idx+1]) else layer_idx
             for model in models:
                 for param_idx, param in enumerate(model.parameters()):
                     if param_idx <= freeze_idx:
@@ -222,8 +198,8 @@ def main(args):
                 test_accs[model_idx].append(cur_test_accs[model_idx])
         for model_idx, model in enumerate(models):
             if args.dump_intermediate_models:
-                torch.save(model, model_dump_path/f'local_model_{model_idx}_{layer_idx+1}.pth')
-        if not args.debug:
+                torch.save(model, model_dump_path/f'local_model_{args.model_type}_{model_idx}_{layer_idx+1}.pth')
+        if not args.skip_eval:
             # Eval model perf
             eval_model(models)
         # Get newly trained weights
@@ -232,15 +208,16 @@ def main(args):
         
     if not args.match_all_layers:
         # For final layer+bias, take weighted average of local models
-        new_weights, new_biases = utils.compute_weighted_avg_of_weights(batch_weights, traindata_cls_counts)
-        global_weights[n_layers-2] = new_weights
-        global_weights[n_layers-1] = new_biases
+        new_weights = utils.compute_weighted_avg_of_weights(batch_weights, traindata_cls_counts)
+        global_weights[n_layers-1] = new_weights
+        # global_weights[n_layers-1] = new_biases
 
-    global_model = model_zoo.get_model(args)
+    # Use model_0 as a skeleton for the global model
+    global_model = models[0]
     for layer_idx in global_weights:
         utils.set_params(global_model, global_weights[layer_idx], layer_idx)
     if args.dump_intermediate_models:
-        torch.save(global_model, model_dump_path/'global_model.pth')
+        torch.save(global_model, model_dump_path/f'global_model_{args.model_type}.pth')
     
     train_dl, test_dl = datasets.get_dataloader(args.dataset, args.datadir, args.batch_size, args.batch_size)
     diff_train_acc = compute_accuracy(global_model, train_dl)
@@ -248,6 +225,39 @@ def main(args):
     logging.debug('****** Diff matching ******** ')
     logging.debug(f'Diff matching (Train acc): {diff_train_acc}')
     logging.debug(f'Diff matching (Test acc): {diff_test_acc}')
+    return train_accs, test_accs, diff_train_acc, diff_test_acc
+
+def main(args):
+    # Set up data loaders
+    logging.debug('Partitioning data')
+    model_dump_path = Path(args.logdir).parent
+    net_dataidx_map, traindata_cls_counts = datasets.partition_data(
+                    args.dataset, args.datadir, args.logdir, args.partition, args.n_nets, args.alpha)
+    utils.dump(args, json.dumps(net_dataidx_map), 'net_dataidx_map')
+    train_accs = [[] for _ in range(args.n_nets)]
+    test_accs = [[] for _ in range(args.n_nets)]
+
+    if args.load_pretrained_models:
+        logging.debug('Loading pretrained models')
+        models = utils.load_models_from_disk(args)
+        logging.debug('Evaluating pretrained models')
+        if not args.skip_eval:
+            eval_model(models)
+    else:
+        logging.debug('Training new models')
+        models = [model_zoo.get_model(args) for _ in range(args.n_nets)]
+        if not args.skip_training:
+            cur_train_accs, cur_test_accs = train(models, args, net_dataidx_map)
+            for idx, model in enumerate(models):
+                train_accs[idx].append(cur_train_accs[idx])
+                test_accs[idx].append(cur_test_accs[idx])
+                if args.dump_intermediate_models:
+                    model_dump_path = Path(args.logdir).parent
+                    torch.save(model, model_dump_path / f'local_model_{args.model_type}_{idx}_0.pth')
+    
+    diff_match_train_accs, diff_match_test_accs, diff_match_global_train_acc, diff_match_global_test_acc = run_diff_match(args,
+                                                                                                            models, net_dataidx_map, 
+                                                                                                            traindata_cls_counts, model_dump_path)
 
 if __name__ == '__main__':
     args = utils.get_parser()

@@ -16,7 +16,7 @@ def get_parser():
     parser.add_argument('--init_seed', type=int, required=False, default=0, help="Random seed")
 
     parser.add_argument('--net_config', type=lambda x: list(map(int, x.split(', '))))
-    parser.add_argument('--model_type', type=str, default='mlp', help="Net type [mlp/lenet/vgg9]")
+    parser.add_argument('--model_type', type=str, default='mlp', help="Net type [mlp/lenet/vgg9/vgg11]")
     parser.add_argument('--n_nets', type=int , required=True, help="Number of nets to initialize")
 
     parser.add_argument('--lr', type=float, required=True, help="Learning rate")
@@ -35,6 +35,7 @@ def get_parser():
     # Debugging settings
     parser.add_argument('--debug', action="store_true", help="Debug mode, skips some steps")
     parser.add_argument('--speed_run', action="store_true", help="Super debug mode, skip all learning steps")
+    parser.add_argument('--skip_eval', action="store_true", help="Skip occasional model evals")
     parser.add_argument('--skip_training', action="store_true", help="Skip initial model training")
     parser.add_argument('--skip_retraining', action="store_true", help="Skip model retraining")
     parser.add_argument('--log_stderr', action="store_true", help="Print logs to stderr as well as logfile")
@@ -47,14 +48,14 @@ def get_parser():
     log_path = Path(args.logdir) / cur_time
     log_path.mkdir(parents=True, exist_ok=True)
     args.logdir = str(log_path)
-    if args.debug:
-        args.diff_match_epochs = 2000
     if args.speed_run:
-        args.debug = True
+        args.skip_eval = True
         args.skip_training = True
         args.diff_match_epochs = 1
         args.epochs = 1
-    dump(args, json.dumps(vars(args)), 'arguments.json')
+    dump_path = Path(args.logdir) / 'arguments.json'
+    with dump_path.open(mode='w') as f:
+        f.write(json.dumps(vars(args)))
     return args
 
 def dump(args, data, name):
@@ -75,7 +76,7 @@ def setup_logging(args):
 def load_models_from_disk(args):
     models = []
     for n in range(args.n_nets):
-        model_path = Path(args.logdir).parent / f'local_model_{n}_0.pth'
+        model_path = Path(args.logdir).parent / f'local_model_{args.model_type}_{n}_0.pth'
         models.append(torch.load(model_path))
     return models
 
@@ -99,6 +100,7 @@ def permute_params(models, pi_li, layer_idx, args):
     if args.skip_bias_match:
         bias_key = list(statedict.keys())[layer_idx+1]
         if 'bias' in bias_key:
+            logging.debug(f'permuting [{bias_key}] with last matrix')
             cur_biases = [model.state_dict()[bias_key].detach() for model in models]
             cur_biases = torch.stack([bias.unsqueeze(0) for bias in cur_biases])
             new_biases = torch.sum(torch.matmul(cur_biases, pi_li),axis=0) / len(models)
@@ -110,7 +112,7 @@ def permute_params(models, pi_li, layer_idx, args):
             statedict = model.state_dict()
             weight_key = list(statedict.keys())[layer_idx+1]
             cur_weight = statedict[weight_key].detach()
-            if 'conv' in weight_key:
+            if len(cur_weight.shape) > 2:
                 cur_weight = cur_weight.permute(1,2,3,0)
                 original_shape = cur_weight.shape
                 cur_weight = cur_weight.reshape(cur_weight.shape[0],-1)
@@ -137,11 +139,8 @@ def compute_weighted_avg_of_weights(batch_weights, traindata_cls_counts):
         for cls_idx, cls_count in model_cls_counts.items():
             counts[model_idx][cls_idx] = cls_count
     weights = counts / counts.sum(axis=0)
-    new_weights = torch.zeros_like(batch_weights[0][-2])
-    new_biases = torch.zeros_like(batch_weights[0][-1][0])
+    new_weights = torch.zeros_like(batch_weights[0][-1])
     for model_idx, weightings in enumerate(weights):
         for output_dim in range(len(weightings)):
-            # weight biases
-            new_biases[output_dim] += weightings[output_dim] * batch_weights[model_idx][-1][0][output_dim]
-            new_weights[:,output_dim] += weightings[output_dim] * batch_weights[model_idx][-2][:,output_dim]
-    return new_weights, new_biases
+            new_weights[:,output_dim] += weightings[output_dim] * batch_weights[model_idx][-1][:,output_dim]
+    return new_weights
