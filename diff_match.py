@@ -17,11 +17,13 @@ class MatchOneLayer(nn.Module):
 
         self.pi_li = nn.Parameter(torch.rand(num_models, output_size, output_size))
         self.log_softmax = nn.LogSoftmax(dim=1)
+        self.pdist = nn.PairwiseDistance(p=2)
+        self.softmax = nn.Softmax(dim=2)
         
 
     def forward(self, layer_weights):
         # Cost: euclidean distance
-        pi_li_2 = self.pi_li ** 2
+        pi_li_2 = self.softmax(self.pi_li)# ** 2
         transported_layer_weights = torch.matmul(layer_weights, pi_li_2)
         global_layer_weights = (torch.sum(transported_layer_weights,axis=0) / self.num_models).detach()
         c = torch.cdist(global_layer_weights.T, layer_weights.permute(0,2,1)) #torch.cdist(global_layer_weights, layer_weights) # Get the euclidean distance from theta to local model weights
@@ -29,7 +31,8 @@ class MatchOneLayer(nn.Module):
         # log_p = self.log_softmax(c)
         # neg_log_p = -1 * log_p
         # Sum across neurons and models
-        loss = torch.sum(pi_li_2/self.output_size * c) / self.num_models # Multiply our "permutation" matrix by -log(c) and square the sum, we want to minimize this
+        # loss = torch.sum(pi_li_2/self.output_size * c) / self.num_models # Multiply our "permutation" matrix by -log(c) and square the sum, we want to minimize this
+        loss = self.pdist(transported_layer_weights[0].T, transported_layer_weights[1].T).sum()
 
         # Col sums
         col_sums = torch.sum(pi_li_2, dim=1)
@@ -37,13 +40,13 @@ class MatchOneLayer(nn.Module):
         squared_col_diff = torch.sum(col_diff_to_one ** 2)
 
         # Row sums
-        row_sums = torch.sum(pi_li_2, dim=2)
-        row_diff_to_one = row_sums - torch.ones_like(row_sums)
-        squared_row_diff = torch.sum(row_diff_to_one ** 2)
+        # row_sums = torch.sum(pi_li_2, dim=2)
+        # row_diff_to_one = row_sums - torch.ones_like(row_sums)
+        # squared_row_diff = torch.sum(row_diff_to_one ** 2)
 
-        post_loss = loss + squared_row_diff + squared_col_diff
+        post_loss = loss + squared_col_diff #+ squared_row_diff + squared_col_diff
 
-        return post_loss, [loss, squared_row_diff, squared_col_diff], global_layer_weights.detach()
+        return post_loss, [loss, 0, squared_col_diff], global_layer_weights.detach()
 
 def prepare_weights(models):
     weights = []
@@ -52,8 +55,8 @@ def prepare_weights(models):
         for weight_key, weight in model.state_dict().items():
             if len(weight.shape) == 1:
                 cur_weights.append(weight.unsqueeze(0).detach())
-            elif 'conv' in weight_key:
-                weight = weight.reshape(-1, weight.shape[0])
+            elif len(weight.shape) > 2:
+                weight = weight.reshape(weight.shape[0], -1).T
                 cur_weights.append(weight.detach())
             else:
                 cur_weights.append(weight.T.detach())
@@ -100,7 +103,7 @@ def get_matched_weights(cur_weights, layer_idx, args):
     if args.dump_intermediate_models:
         torch.save(match, Path(args.logdir)/f'match_{layer_idx}.pth')
     loss, losses_arr, global_layer_weights = match(layer_weights)
-    pi_li = match.pi_li.detach().cpu() ** 2
+    pi_li = match.softmax(match.pi_li).detach().cpu()# ** 2
     logging.debug(f'Best Loss (should be {best_loss})\nLoss: {loss}\nMatching Loss: {losses_arr[0]}\nRow Loss: {losses_arr[1]}\nCol Loss: {losses_arr[2]}\n')
 
     return global_layer_weights, pi_li
