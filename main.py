@@ -210,7 +210,6 @@ def run_diff_match(args, models, net_dataidx_map, traindata_cls_counts, model_du
         # For final layer+bias, take weighted average of local models
         new_weights = utils.compute_weighted_avg_of_weights(batch_weights, traindata_cls_counts)
         global_weights[n_layers-1] = new_weights
-        # global_weights[n_layers-1] = new_biases
 
     # Use model_0 as a skeleton for the global model
     global_model = models[0]
