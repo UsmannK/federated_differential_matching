@@ -28,7 +28,7 @@ class FcNet(nn.Module):
             ip_dim = self.dims[i]
             op_dim = self.dims[i+1]
             self.layers.append(
-                nn.Linear(ip_dim, op_dim, bias=True)
+                nn.Linear(ip_dim, op_dim, bias=False)
             )
 
         self.__init_net_weights__()
@@ -37,7 +37,7 @@ class FcNet(nn.Module):
 
         for m in self.layers:
             m.weight.data.normal_(0.0, 0.1)
-            m.bias.data.fill_(0.1)
+            # m.bias.data.fill_(0.1)
 
     def forward(self, x):
 
@@ -80,24 +80,24 @@ class VGG9(nn.Module):
         super(VGG9, self).__init__()
         self.conv_layer = nn.Sequential(
             # Conv Layer block 1
-            nn.Conv2d(in_channels=3, out_channels=32, kernel_size=3, padding=1),
+            nn.Conv2d(in_channels=3, out_channels=32, kernel_size=3, padding=1, bias=False),
             nn.ReLU(inplace=True),
-            nn.Conv2d(in_channels=32, out_channels=64, kernel_size=3, padding=1),
+            nn.Conv2d(in_channels=32, out_channels=64, kernel_size=3, padding=1, bias=False),
             nn.ReLU(inplace=True),
             nn.MaxPool2d(kernel_size=2, stride=2),
 
             # Conv Layer block 2
-            nn.Conv2d(in_channels=64, out_channels=128, kernel_size=3, padding=1),
+            nn.Conv2d(in_channels=64, out_channels=128, kernel_size=3, padding=1, bias=False),
             nn.ReLU(inplace=True),
-            nn.Conv2d(in_channels=128, out_channels=128, kernel_size=3, padding=1),
+            nn.Conv2d(in_channels=128, out_channels=128, kernel_size=3, padding=1, bias=False),
             nn.ReLU(inplace=True),
             nn.MaxPool2d(kernel_size=2, stride=2),
             nn.Dropout2d(p=0.05),
 
             # Conv Layer block 3
-            nn.Conv2d(in_channels=128, out_channels=256, kernel_size=3, padding=1),
+            nn.Conv2d(in_channels=128, out_channels=256, kernel_size=3, padding=1, bias=False),
             nn.ReLU(inplace=True),
-            nn.Conv2d(in_channels=256, out_channels=256, kernel_size=3, padding=1),
+            nn.Conv2d(in_channels=256, out_channels=256, kernel_size=3, padding=1, bias=False),
             nn.ReLU(inplace=True),
             nn.MaxPool2d(kernel_size=2, stride=2),
         )
@@ -105,13 +105,13 @@ class VGG9(nn.Module):
         self.fc_layer = nn.Sequential(
             nn.Dropout(p=0.1),
             #nn.Linear(4096, 1024),
-            nn.Linear(4096, 512),
+            nn.Linear(4096, 512, bias=False),
             nn.ReLU(inplace=True),
             #nn.Linear(1024, 512),
-            nn.Linear(512, 512),
+            nn.Linear(512, 512, bias=False),
             nn.ReLU(inplace=True),
             nn.Dropout(p=0.1),
-            nn.Linear(512, 10)
+            nn.Linear(512, 10, bias=False)
         )
 
     def forward(self, x):
@@ -123,8 +123,12 @@ class VGG9(nn.Module):
 model_types = {
     'mlp': FcNet,
     'lenet': LeNet,
-    'vgg9': VGG9 
+    'vgg9': VGG9,
+    'vgg11': None
 }
 
 def get_model(args):
-    return model_types[args.model_type](args)
+    model = model_types[args.model_type]
+    if model is None:
+        raise Exception(f'model {args.model_type} unsupported for creation')
+    return model(args)
