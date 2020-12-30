@@ -113,10 +113,10 @@ def permute_params(models, pi_li, layer_idx, args):
             weight_key = list(statedict.keys())[layer_idx+1]
             cur_weight = statedict[weight_key].detach()
             if len(cur_weight.shape) > 2:
-                cur_weight = cur_weight.permute(1,2,3,0)
                 original_shape = cur_weight.shape
-                cur_weight = cur_weight.reshape(cur_weight.shape[0],-1)
-                statedict[weight_key] = (pi_li[idx].T @ cur_weight).reshape(original_shape).permute(3,0,1,2)
+                cur_weight = cur_weight.data.view(cur_weight.shape[0], cur_weight.shape[1], -1)
+                permutation_matrix = pi_li[idx].T.unsqueeze(0).repeat(cur_weight.shape[2], 1, 1)
+                statedict[weight_key] = torch.bmm(cur_weight.permute(2, 0, 1), permutation_matrix).permute(1, 2, 0).view(original_shape)
             else:
                 if pi_li[idx].T.shape[1] != cur_weight.T.shape[0]:
                     reshaped_cur_weight = cur_weight.T.reshape(pi_li[idx].T.shape[1], -1, cur_weight.T.shape[-1]).permute(1,0,2)
