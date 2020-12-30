@@ -11,6 +11,7 @@ import torch.multiprocessing
 import torch.optim as optim
 import torch.nn as nn
 import numpy as np
+from sklearn.metrics import confusion_matrix
 from tqdm import tqdm
 
 # our imports
@@ -38,6 +39,9 @@ def compute_accuracy(model, dataloader):
 
         pred_labels_list = np.append(pred_labels_list, pred_label.cpu().numpy())
         true_labels_list = np.append(true_labels_list, target.data.cpu().numpy())
+    
+    conf_matrix = confusion_matrix(true_labels_list, pred_labels_list)
+    print(conf_matrix)
     return correct/float(total)
 
 def eval_model(models):
