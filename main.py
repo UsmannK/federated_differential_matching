@@ -249,6 +249,7 @@ def main(args):
     else:
         logging.debug('Training new models')
         models = [model_zoo.get_model(args) for _ in range(args.n_nets)]
+        models = utils.equalize_models(models)
         if not args.skip_training:
             cur_train_accs, cur_test_accs = train(models, args, net_dataidx_map)
             for idx, model in enumerate(models):

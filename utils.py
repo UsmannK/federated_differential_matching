@@ -128,6 +128,12 @@ def permute_params(models, pi_li, layer_idx, args):
                 statedict[weight_key] = permuted_weight
             model.load_state_dict(statedict)
 
+def equalize_models(models):
+    sd = models[0].state_dict()
+    for model in models:
+        model.load_state_dict(sd)
+    return models
+
 def compute_weighted_avg_of_weights(batch_weights, traindata_cls_counts):
     n_models = len(traindata_cls_counts)
     class_list = set()
