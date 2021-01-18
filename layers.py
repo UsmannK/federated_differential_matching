@@ -29,7 +29,7 @@ class SinkhornDistance(nn.Module):
 
     def forward(self, x, y):
         # The Sinkhorn algorithm takes as input three variables :
-        C = self._cost_matrix(x, y)  # Wasserstein cost function
+        C = self._cost_matrix(x.contiguous(), y.contiguous())  # Wasserstein cost function
         x_points = x.shape[-2]
         y_points = y.shape[-2]
         if x.dim() == 2:
@@ -39,9 +39,9 @@ class SinkhornDistance(nn.Module):
 
         # both marginals are fixed with equal weights
         mu = torch.empty(batch_size, x_points, dtype=torch.float,
-                         requires_grad=False).fill_(1.0 / x_points).squeeze()
+                         requires_grad=False).fill_(1.0 / x_points).squeeze().to(x.device)
         nu = torch.empty(batch_size, y_points, dtype=torch.float,
-                         requires_grad=False).fill_(1.0 / y_points).squeeze()
+                         requires_grad=False).fill_(1.0 / y_points).squeeze().to(x.device)
 
         u = torch.zeros_like(mu)
         v = torch.zeros_like(nu)
@@ -83,9 +83,10 @@ class SinkhornDistance(nn.Module):
     @staticmethod
     def _cost_matrix(x, y, p=2):
         "Returns the matrix of $|x_i-y_j|^p$."
-        x_col = x.unsqueeze(-2)
-        y_lin = y.unsqueeze(-3)
-        C = torch.sum((torch.abs(x_col - y_lin)) ** p, -1)
+        # x_col = x.unsqueeze(-2)
+        # y_lin = y.unsqueeze(-3)
+        # C = torch.sum((torch.abs(x_col - y_lin)) ** p, -1)
+        C = torch.cdist(x,y)
         return C
 
     @staticmethod

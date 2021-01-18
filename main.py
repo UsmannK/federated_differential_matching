@@ -4,6 +4,7 @@ import argparse
 import logging
 import json
 from pathlib import Path
+import copy
 
 # library imports
 import torch
@@ -46,14 +47,10 @@ def train(models, args, net_dataidx_map):
         dataidxs = net_dataidx_map[model_id]
         train_dl, test_dl = datasets.get_dataloader(args.dataset, args.datadir,
             args.batch_size, args.batch_size, dataidxs, args.num_train_workers)
-        train_acc = utils.compute_accuracy(model, train_dl)
-        test_acc = utils.compute_accuracy(model, test_dl)
         logging.debug('')
         logging.debug(f'Network {model_id}')
         logging.debug(f'n_training: {len(train_dl)}')
         logging.debug(f'n_test: {len(test_dl)}')
-        logging.debug(f'Pre-Training Training accuracy: {train_acc}')
-        logging.debug(f'Pre-Training Test accuracy: {test_acc}')
 
         if mode == GPU:
             gpu_id = model_id % num_gpus
@@ -71,7 +68,9 @@ def train(models, args, net_dataidx_map):
             'epoch': 1,
             'epoch_losses': [],
             'criterion': nn.CrossEntropyLoss().to(device),
-            'training': True
+            'training': True,
+            'best_dict': None,
+            'best_test_acc': -1
         }
         model.to(device)
         model.train()
@@ -93,6 +92,11 @@ def train(models, args, net_dataidx_map):
             except StopIteration:
                 if cur_params['training']:
                     all_epoch_losses[model_id].append(sum(cur_params['epoch_losses']) / len(cur_params['epoch_losses']))
+                    test_acc = compute_accuracy(cur_params['model'], test_dl, device=cur_params['device'], show_conf_matrix=False)
+                    if test_acc > cur_params['best_test_acc']:
+                        cur_params['best_test_acc'] = test_acc
+                        cur_params['best_dict'] = copy.deepcopy(cur_params['model'].state_dict())
+                    cur_params['model'].train()
                 if cur_params['epoch'] < args.epochs:
                     cur_params['epoch'] = cur_params['epoch'] + 1
                     progress_bars[model_id].reset()
@@ -125,12 +129,13 @@ def train(models, args, net_dataidx_map):
     train_accs, test_accs = [], []
     for model_id in params:
         cur_params = params[model_id]
+        cur_params['model'].load_state_dict(cur_params['best_dict'])
         losses = all_epoch_losses[model_id]
         loss_strings = [f'{loss:.5f}' for loss in losses]
 
         model, train_dl, test_dl = cur_params['model'], cur_params['train_dl'], cur_params['test_dl']
-        train_acc = utils.compute_accuracy(model, train_dl)
-        test_acc = utils.compute_accuracy(model, test_dl)
+        train_acc = utils.compute_accuracy(model, train_dl, device=cur_params['device'], show_conf_matrix=False)
+        test_acc = utils.compute_accuracy(model, test_dl, device=cur_params['device'], show_conf_matrix=False)
         train_accs.append(train_acc)
         test_accs.append(test_acc)
 
@@ -139,6 +144,7 @@ def train(models, args, net_dataidx_map):
         logging.debug(f'Last 10 retraining epoch losses: {loss_strings[-10:]}')
         logging.debug(f'Local Training accuracy: {train_acc}')
         logging.debug(f'Local Test accuracy: {test_acc}')
+        logging.debug(f"Best Test accuracy: {cur_params['best_test_acc']}")
     return train_accs, test_accs
 
 def run_diff_match(args, models, net_dataidx_map, traindata_cls_counts, model_dump_path):
@@ -226,6 +232,7 @@ def main(args):
     else:
         logging.debug('Training new models')
         models = [model_zoo.get_model(args) for _ in range(args.n_nets)]
+        models = utils.equalize_models(models)
         if not args.skip_training:
             cur_train_accs, cur_test_accs = train(models, args, net_dataidx_map)
             for idx, model in enumerate(models):
