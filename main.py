@@ -21,34 +21,11 @@ import datasets
 import diff_match
 import external_models
 
-def conditional_log(condition, message):
-    if condition:
-        logging.debug(message)
-
-def compute_accuracy(model, dataloader):
-    model.cpu()
-    model.eval()
-    true_labels_list, pred_labels_list = np.array([]), np.array([])
-    correct, total = 0, 0
-    for x, target in dataloader:
-        out = model(x)
-        _, pred_label = torch.max(out.data, 1)
-
-        total += x.data.size()[0]
-        correct += (pred_label == target.data).sum().item()
-
-        pred_labels_list = np.append(pred_labels_list, pred_label.cpu().numpy())
-        true_labels_list = np.append(true_labels_list, target.data.cpu().numpy())
-    
-    conf_matrix = confusion_matrix(true_labels_list, pred_labels_list)
-    print(conf_matrix)
-    return correct/float(total)
-
 def eval_model(models):
     train_dl, test_dl = datasets.get_dataloader(args.dataset, args.datadir, args.batch_size, args.batch_size)
     for idx, model in enumerate(models):
-        train_acc = compute_accuracy(model, train_dl)
-        test_acc = compute_accuracy(model, test_dl)
+        train_acc = utils.compute_accuracy(model, train_dl)
+        test_acc = utils.compute_accuracy(model, test_dl)
         logging.debug('')
         logging.debug(f'Model {idx}')
         logging.debug(f'Global Training accuracy: {train_acc}')
@@ -61,7 +38,7 @@ def train(models, args, net_dataidx_map):
     num_gpus = torch.cuda.device_count()
     mode = GPU if (num_gpus > 0 and torch.cuda.is_available) else CPU
     logging.debug(f'Training on {mode}')
-    conditional_log(mode == GPU, f'{num_gpus} GPUs available')
+    utils.conditional_log(mode == GPU, f'{num_gpus} GPUs available')
 
     params = {}
 
@@ -69,8 +46,8 @@ def train(models, args, net_dataidx_map):
         dataidxs = net_dataidx_map[model_id]
         train_dl, test_dl = datasets.get_dataloader(args.dataset, args.datadir,
             args.batch_size, args.batch_size, dataidxs, args.num_train_workers)
-        train_acc = compute_accuracy(model, train_dl)
-        test_acc = compute_accuracy(model, test_dl)
+        train_acc = utils.compute_accuracy(model, train_dl)
+        test_acc = utils.compute_accuracy(model, test_dl)
         logging.debug('')
         logging.debug(f'Network {model_id}')
         logging.debug(f'n_training: {len(train_dl)}')
@@ -152,8 +129,8 @@ def train(models, args, net_dataidx_map):
         loss_strings = [f'{loss:.5f}' for loss in losses]
 
         model, train_dl, test_dl = cur_params['model'], cur_params['train_dl'], cur_params['test_dl']
-        train_acc = compute_accuracy(model, train_dl)
-        test_acc = compute_accuracy(model, test_dl)
+        train_acc = utils.compute_accuracy(model, train_dl)
+        test_acc = utils.compute_accuracy(model, test_dl)
         train_accs.append(train_acc)
         test_accs.append(test_acc)
 
@@ -223,8 +200,8 @@ def run_diff_match(args, models, net_dataidx_map, traindata_cls_counts, model_du
         torch.save(global_model, model_dump_path/f'global_model_{args.model_type}.pth')
     
     train_dl, test_dl = datasets.get_dataloader(args.dataset, args.datadir, args.batch_size, args.batch_size)
-    diff_train_acc = compute_accuracy(global_model, train_dl)
-    diff_test_acc = compute_accuracy(global_model, test_dl)
+    diff_train_acc = utils.compute_accuracy(global_model, train_dl)
+    diff_test_acc = utils.compute_accuracy(global_model, test_dl)
     logging.debug('****** Diff matching ******** ')
     logging.debug(f'Diff matching (Train acc): {diff_train_acc}')
     logging.debug(f'Diff matching (Test acc): {diff_test_acc}')

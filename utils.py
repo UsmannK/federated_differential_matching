@@ -58,6 +58,29 @@ def get_parser():
         f.write(json.dumps(vars(args)))
     return args
 
+def compute_accuracy(model, dataloader):
+    model.cpu()
+    model.eval()
+    true_labels_list, pred_labels_list = np.array([]), np.array([])
+    correct, total = 0, 0
+    for x, target in dataloader:
+        out = model(x)
+        _, pred_label = torch.max(out.data, 1)
+
+        total += x.data.size()[0]
+        correct += (pred_label == target.data).sum().item()
+
+        pred_labels_list = np.append(pred_labels_list, pred_label.cpu().numpy())
+        true_labels_list = np.append(true_labels_list, target.data.cpu().numpy())
+    
+    conf_matrix = confusion_matrix(true_labels_list, pred_labels_list)
+    print(conf_matrix)
+    return correct/float(total)
+    
+def conditional_log(condition, message):
+    if condition:
+        logging.debug(message)
+
 def dump(args, data, name):
     if not args.dump_intermediate_models:
         return
