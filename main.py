@@ -148,6 +148,7 @@ def train(models, args, net_dataidx_map):
     return train_accs, test_accs
 
 def run_diff_match(args, models, net_dataidx_map, traindata_cls_counts, model_dump_path):
+    device = torch.device('cuda') if (num_gpus > 0 and torch.cuda.is_available) else  torch.device('cpu')
     train_accs = [[] for _ in range(args.n_nets)]
     test_accs = [[] for _ in range(args.n_nets)]
     # Diff Matching
@@ -165,7 +166,7 @@ def run_diff_match(args, models, net_dataidx_map, traindata_cls_counts, model_du
                 logging.debug('')
                 continue
         # Matching algo
-        new_weights, pi_li = diff_match.compute_diff_matching(batch_weights, layer_idx, args)
+        new_weights, pi_li = diff_match.compute_diff_matching(batch_weights, layer_idx, args, device)
         global_weights[layer_idx] = new_weights
         utils.set_params(models, new_weights, layer_idx)
         # Permute next layer

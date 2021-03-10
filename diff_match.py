@@ -72,12 +72,12 @@ def prepare_weights(models):
         weights.append(cur_weights)
     return weights
 
-def compute_diff_matching(weights, layer_idx, args):
+def compute_diff_matching(weights, layer_idx, args, device):
     cur_weights = [w[layer_idx] for w in weights]
-    matched_weights, pi_li = get_matched_weights(cur_weights, layer_idx, args)
+    matched_weights, pi_li = get_matched_weights(cur_weights, layer_idx, args, device)
     return matched_weights, pi_li
 
-def get_matched_weights(cur_weights, layer_idx, args):
+def get_matched_weights(cur_weights, layer_idx, args, device):
     device = torch.device(0) if torch.cuda.is_available() else torch.device("cpu")
     layer_weights = torch.stack(cur_weights)
     best_loss = None
@@ -125,15 +125,15 @@ def get_matched_weights(cur_weights, layer_idx, args):
     mu = torch.ones(mu_cardinality)/mu_cardinality
     nu = torch.ones(nu_cardinality)/nu_cardinality
 
-    layer_weights = torch.Tensor(layer_weights).permute(0,2,1)
+    layer_weights = layer_weights.permute(0,2,1)
     T_arr = [torch.eye(output_size)]
     for layer_weight in layer_weights[1:]:
         T = ot.emd(mu,nu,torch.cdist(layer_weight, layer_weights[0]).detach().cpu()) * output_size
-        T = torch.Tensor(T)
+        T = torch.Tensor(T, device=device)
         T_arr.append(T)
     pi_li = torch.stack(T_arr)
-    layer_weights = torch.Tensor(layer_weights).permute(0,2,1)
+    layer_weights = layer_weights.permute(0,2,1)
     transported_layer_weights = torch.matmul(layer_weights.cpu(), pi_li)
     global_layer_weights = (torch.sum(transported_layer_weights,axis=0) / len(transported_layer_weights))
 
-    return torch.Tensor(global_layer_weights), pi_li
+    return global_layer_weights, pi_li
