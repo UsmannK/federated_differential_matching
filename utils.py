@@ -6,6 +6,7 @@ from functools import reduce
 from pathlib import Path
 
 import torch
+import numpy as np
 
 def get_parser():
     parser = argparse.ArgumentParser()
@@ -58,12 +59,13 @@ def get_parser():
         f.write(json.dumps(vars(args)))
     return args
 
-def compute_accuracy(model, dataloader):
-    model.cpu()
+def compute_accuracy(model, dataloader, device=torch.device('cpu')):
+    model.to(device)
     model.eval()
     true_labels_list, pred_labels_list = np.array([]), np.array([])
     correct, total = 0, 0
     for x, target in dataloader:
+        x,target = x.to(device), target.to(device)
         out = model(x)
         _, pred_label = torch.max(out.data, 1)
 
@@ -72,9 +74,7 @@ def compute_accuracy(model, dataloader):
 
         pred_labels_list = np.append(pred_labels_list, pred_label.cpu().numpy())
         true_labels_list = np.append(true_labels_list, target.data.cpu().numpy())
-    
-    conf_matrix = confusion_matrix(true_labels_list, pred_labels_list)
-    print(conf_matrix)
+        
     return correct/float(total)
     
 def conditional_log(condition, message):

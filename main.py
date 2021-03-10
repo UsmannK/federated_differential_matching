@@ -92,7 +92,7 @@ def train(models, args, net_dataidx_map):
             except StopIteration:
                 if cur_params['training']:
                     all_epoch_losses[model_id].append(sum(cur_params['epoch_losses']) / len(cur_params['epoch_losses']))
-                    test_acc = compute_accuracy(cur_params['model'], test_dl, device=cur_params['device'], show_conf_matrix=False)
+                    test_acc = utils.compute_accuracy(cur_params['model'], test_dl, device=cur_params['device'])#, show_conf_matrix=False)
                     if test_acc > cur_params['best_test_acc']:
                         cur_params['best_test_acc'] = test_acc
                         cur_params['best_dict'] = copy.deepcopy(cur_params['model'].state_dict())
@@ -134,8 +134,8 @@ def train(models, args, net_dataidx_map):
         loss_strings = [f'{loss:.5f}' for loss in losses]
 
         model, train_dl, test_dl = cur_params['model'], cur_params['train_dl'], cur_params['test_dl']
-        train_acc = utils.compute_accuracy(model, train_dl, device=cur_params['device'], show_conf_matrix=False)
-        test_acc = utils.compute_accuracy(model, test_dl, device=cur_params['device'], show_conf_matrix=False)
+        train_acc = utils.compute_accuracy(model, train_dl, device=cur_params['device'])#, show_conf_matrix=False)
+        test_acc = utils.compute_accuracy(model, test_dl, device=cur_params['device'])#, show_conf_matrix=False)
         train_accs.append(train_acc)
         test_accs.append(test_acc)
 

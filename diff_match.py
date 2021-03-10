@@ -128,7 +128,7 @@ def get_matched_weights(cur_weights, layer_idx, args):
     layer_weights = torch.Tensor(layer_weights).permute(0,2,1)
     T_arr = [torch.eye(output_size)]
     for layer_weight in layer_weights[1:]:
-        T = ot.emd(mu,nu,torch.cdist(layer_weight.T, layer_weights[0].T).detach().cpu()) * output_size
+        T = ot.emd(mu,nu,torch.cdist(layer_weight, layer_weights[0]).detach().cpu()) * output_size
         T = torch.Tensor(T)
         T_arr.append(T)
     pi_li = torch.stack(T_arr)
