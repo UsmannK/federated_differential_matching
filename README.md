@@ -15,8 +15,13 @@ What is promising:
 
 To see how to use an OT solver to match networks, see: https://github.com/sidak/otfusion
 
+-----
 
 Example of a 1-shot merge of 5x VGG-9 homogeneously trained models (CIFAR10):
+
+command: `python main.py --logdir logs/cifar_test --dataset cifar10 --datadir data/cifar10 --n_nets 5 --dump_intermediate_models --partition homo --lr 0.01 --epochs 25 --model_type vgg9 --skip_eval --skip_retraining --match_all_layers --log_stderr`
+
+To use MNIST and MLP change the `--dataset` and `model_type` as per `utils.py`
 
 ```
 Model 0
