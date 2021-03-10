@@ -85,97 +85,55 @@ def get_matched_weights(cur_weights, layer_idx, args):
     output_size = layer_weights.shape[2]
     input_size = layer_weights.shape[1]
 
-    match = MatchOneLayer(input_size, output_size, num_model)
-    match = match.to(device)
-    layer_weights = layer_weights.permute(0,2,1).cpu().numpy()
-    layer_weights = np.float64(layer_weights)
-    weight_weights = np.ones(layer_weights.shape[:-1],dtype=np.double)/layer_weights.shape[1]
-    optimizer = optim.Adam(match.parameters(), lr=args.lr)
-    for epoch in range(args.diff_match_epochs):
-        optimizer.zero_grad()
-        loss, losses_arr, global_layer_weights,pi_li = match(layer_weights)
+    # match = MatchOneLayer(input_size, output_size, num_model)
+    # match = match.to(device)
+    # layer_weights = layer_weights.permute(0,2,1).cpu().numpy()
+    # layer_weights = np.float64(layer_weights)
+    # weight_weights = np.ones(layer_weights.shape[:-1],dtype=np.double)/layer_weights.shape[1]
+    # optimizer = optim.Adam(match.parameters(), lr=args.lr)
+    # for epoch in range(args.diff_match_epochs):
+    #     optimizer.zero_grad()
+    #     loss, losses_arr, global_layer_weights,pi_li = match(layer_weights)
         
-        if best_loss is None or loss < best_loss:
-            best_dict = copy.deepcopy(match.state_dict())
-            best_loss = loss
+    #     if best_loss is None or loss < best_loss:
+    #         best_dict = copy.deepcopy(match.state_dict())
+    #         best_loss = loss
 
-        loss.backward()
-        optimizer.step()
+    #     loss.backward()
+    #     optimizer.step()
         
-        pi_li_ones = torch.zeros_like(pi_li)
-        pi_li_ones[[0,1], torch.stack([torch.arange(0,output_size), torch.arange(0,output_size)]).T, pi_li.argmax(2).T] = 1
-        transported_ones = torch.matmul(layer_weights, pi_li_ones)
+    #     pi_li_ones = torch.zeros_like(pi_li)
+    #     pi_li_ones[[0,1], torch.stack([torch.arange(0,output_size), torch.arange(0,output_size)]).T, pi_li.argmax(2).T] = 1
+    #     transported_ones = torch.matmul(layer_weights, pi_li_ones)
 
-        if (epoch+1) % 10 == 0 or epoch == 0:
-            logging.debug(f'Epoch {epoch+1:5}')
-            logging.debug(f'Loss: {loss}')
-            logging.debug(f'pdist: {torch.nn.PairwiseDistance(p=2)(transported_ones[0].T, transported_ones[1].T).sum()}')
-            logging.debug(f'Matching Loss: {losses_arr[0]}')
-            logging.debug(f'Row Loss: {losses_arr[1]}')
-            logging.debug(f'Col Loss: {losses_arr[2]}')
-            logging.debug(f'')
+    #     if (epoch+1) % 10 == 0 or epoch == 0:
+    #         logging.debug(f'Epoch {epoch+1:5}')
+    #         logging.debug(f'Loss: {loss}')
+    #         logging.debug(f'pdist: {torch.nn.PairwiseDistance(p=2)(transported_ones[0].T, transported_ones[1].T).sum()}')
+    #         logging.debug(f'Matching Loss: {losses_arr[0]}')
+    #         logging.debug(f'Row Loss: {losses_arr[1]}')
+    #         logging.debug(f'Col Loss: {losses_arr[2]}')
+    #         logging.debug(f'')
 
-    match.load_state_dict(best_dict)
-    if args.dump_intermediate_models:
-        torch.save(match, Path(args.logdir)/f'match_{layer_idx}.pth')
-    loss, losses_arr, global_layer_weights, pi_li = match(layer_weights)
-    pi_li = pi_li*100
+    # match.load_state_dict(best_dict)
+    # if args.dump_intermediate_models:
+    #     torch.save(match, Path(args.logdir)/f'match_{layer_idx}.pth')
+    # loss, losses_arr, global_layer_weights, pi_li = match(layer_weights)
+    # pi_li = pi_li*100
 
-    # mu_cardinality, nu_cardinality = output_size,output_size
-    # mu = torch.ones(mu_cardinality)/mu_cardinality
-    # nu = torch.ones(nu_cardinality)/nu_cardinality
+    mu_cardinality, nu_cardinality = output_size,output_size
+    mu = torch.ones(mu_cardinality)/mu_cardinality
+    nu = torch.ones(nu_cardinality)/nu_cardinality
 
-    # X_init =  np.random.normal(0., 1., (output_size, input_size))
-    # b = np.ones(output_size)/output_size
-    # global_layer_weights = ot.lp.free_support_barycenter(layer_weights, weight_weights, layer_weights[1])
-    # X_init_global_weights = ot.lp.free_support_barycenter(layer_weights, weight_weights, X_init)
-    # lw0_global_weights = ot.lp.free_support_barycenter(layer_weights, weight_weights, layer_weights[0])
-
-    # M = scipy.spatial.distance.cdist(global_layer_weights,layer_weights[1])
-    # barycenter_transport_map = ot.emd(mu,nu,M)*output_size
-    # global_layer_weights = (global_layer_weights.T @ barycenter_transport_map).T
-
-    # pi_li = torch.stack([torch.Tensor(ot.emd(mu,nu,scipy.spatial.distance.cdist(layer_weights[x],global_layer_weights))*output_size) for x in range(2)])
-
-    # layer_weights = torch.Tensor(layer_weights).permute(0,2,1)
-    # T = ot.emd(mu,nu,torch.cdist(layer_weights[0].T, layer_weights[1].T).detach().cpu()) * output_size
-    # T = torch.Tensor(T)
-    # pi_li = torch.stack([T, torch.eye(output_size)])
+    layer_weights = torch.Tensor(layer_weights).permute(0,2,1)
+    T_arr = [torch.eye(output_size)]
+    for layer_weight in layer_weights[1:]:
+        T = ot.emd(mu,nu,torch.cdist(layer_weight.T, layer_weights[0].T).detach().cpu()) * output_size
+        T = torch.Tensor(T)
+        T_arr.append(T)
+    pi_li = torch.stack(T_arr)
     layer_weights = torch.Tensor(layer_weights).permute(0,2,1)
     transported_layer_weights = torch.matmul(layer_weights.cpu(), pi_li)
     global_layer_weights = (torch.sum(transported_layer_weights,axis=0) / len(transported_layer_weights))
-
-    # Get the exact T_matrices that would transport the originals to the global model
-    # T_matrices = []
-    # for layer_weight in layer_weights:
-    #     C = torch.cdist(layer_weight.T, match.global_model.T)
-    #     t_matrix = ot.emd(mu,nu,C.detach().cpu()) * output_size
-    #     T_matrices.append(torch.Tensor(t_matrix).to(layer_weights.device))
-    # T_matrices = torch.stack(T_matrices)
-    # exact_transported_layer_weights = torch.matmul(layer_weights, T_matrices)
-
-    # _,pi_li ,_ = SinkhornDistance(eps=0.001, max_iter=1000, reduction=None)(layer_weights[0].T, layer_weights[1].T)
-    # import ot
-    # mu = torch.ones(output_size)/output_size
-    # nu = torch.ones(output_size)/output_size
-    # pi_li = torch.Tensor(ot.emd(mu,nu,torch.cdist(layer_weights[0].T, layer_weights[1].T)))
-
-    # C = torch.cdist(*layer_weights.permute(0,2,1)).cpu()
-    # ot_matrix = torch.Tensor(ot.emd(mu,nu,C)) * output_size
-    # pi_li_ot = torch.stack([ot_matrix , torch.eye(output_size)])
-    # transported_layer_weights = torch.matmul(layer_weights, pi_li)#layer_weights.permute(0,2,1)).permute(0,2,1)
-
-    # transported_layer_weights = torch.matmul(layer_weights, pi_li)
-    # global_layer_weights = (torch.sum(transported_layer_weights,axis=0) / len(transported_layer_weights))
-    # del layer_weights
-    # transport_matrix[pi_li]
-    # pi_li = match.pi_li.detach().cpu()# ** 2
-    # for _ in range(100):
-    #     pi_li = pi_li - torch.logsumexp(pi_li, 2).reshape(-1, match.output_size, 1)
-    #     pi_li = pi_li - torch.logsumexp(pi_li, 1).reshape(-1, 1, match.output_size)
-    # pi_li = torch.exp(pi_li)
-    # logging.debug(f'Best Loss (should be {best_loss})\nLoss: {loss}\nMatching Loss: {losses_arr[0]}\nRow Loss: {losses_arr[1]}\nCol Loss: {losses_arr[2]}\n')
-
-
 
     return torch.Tensor(global_layer_weights), pi_li

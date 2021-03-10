@@ -219,7 +219,6 @@ def main(args):
     model_dump_path = Path(args.logdir).parent
     net_dataidx_map, traindata_cls_counts = datasets.partition_data(
                     args.dataset, args.datadir, args.logdir, args.partition, args.n_nets, args.alpha)
-    utils.dump(args, json.dumps(net_dataidx_map), 'net_dataidx_map')
     train_accs = [[] for _ in range(args.n_nets)]
     test_accs = [[] for _ in range(args.n_nets)]
 
