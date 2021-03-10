@@ -14,3 +14,44 @@ What is promising:
     - This works but is not much better than FedAvg. I suggest trying to add an OT component _to_ FedAvg and see what that looks like.
 
 To see how to use an OT solver to match networks, see: https://github.com/sidak/otfusion
+
+
+Example of a 1-shot merge of 5x VGG-9 homogeneously trained models (CIFAR10):
+
+```
+Model 0
+Last 10 retraining epoch losses: ['1.26606', '1.21634', '1.16008', '1.10885', '1.08537', '1.02599', '0.98416', '0.94997', '0.90053', '0.85081']
+Local Training accuracy: 0.7349
+Local Test accuracy: 0.7033
+Best Test accuracy: 0.7033
+
+Model 1
+Last 10 retraining epoch losses: ['1.28904', '1.21895', '1.16897', '1.12750', '1.06396', '1.03258', '0.98671', '0.93217', '0.89650', '0.86378']
+Local Training accuracy: 0.7366
+Local Test accuracy: 0.7037
+Best Test accuracy: 0.7037
+
+Model 2
+Last 10 retraining epoch losses: ['1.27366', '1.25162', '1.20062', '1.12890', '1.09396', '1.04567', '1.00820', '0.96150', '0.94080', '0.89861']
+Local Training accuracy: 0.7354
+Local Test accuracy: 0.6982
+Best Test accuracy: 0.6982
+
+Model 3
+Last 10 retraining epoch losses: ['1.27082', '1.22383', '1.15883', '1.11653', '1.06384', '1.02371', '0.99501', '0.94721', '0.90649', '0.88344']
+Local Training accuracy: 0.7184
+Local Test accuracy: 0.6936
+Best Test accuracy: 0.6936
+
+Model 4
+Last 10 retraining epoch losses: ['1.26593', '1.22068', '1.18205', '1.13190', '1.09292', '1.02878', '0.99948', '0.95713', '0.90597', '0.89311']
+Local Training accuracy: 0.7108
+Local Test accuracy: 0.6838
+Best Test accuracy: 0.6838
+
+****** Diff matching ******** 
+Diff matching (Train acc): 0.63376
+Diff matching (Test acc): 0.6511
+```
+
+Trained to .7, matched and merged at 0.65 with no retraining
