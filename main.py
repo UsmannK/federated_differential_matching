@@ -207,8 +207,8 @@ def run_diff_match(args, models, net_dataidx_map, traindata_cls_counts, model_du
         torch.save(global_model, model_dump_path/f'global_model_{args.model_type}.pth')
     
     train_dl, test_dl = datasets.get_dataloader(args.dataset, args.datadir, args.batch_size, args.batch_size)
-    diff_train_acc = utils.compute_accuracy(global_model, train_dl)
-    diff_test_acc = utils.compute_accuracy(global_model, test_dl)
+    diff_train_acc = utils.compute_accuracy(global_model, train_dl, device=device)
+    diff_test_acc = utils.compute_accuracy(global_model, test_dl, device=device)
     logging.debug('****** Diff matching ******** ')
     logging.debug(f'Diff matching (Train acc): {diff_train_acc}')
     logging.debug(f'Diff matching (Test acc): {diff_test_acc}')
