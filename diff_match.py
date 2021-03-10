@@ -133,7 +133,7 @@ def get_matched_weights(cur_weights, layer_idx, args, device):
         T_arr.append(T)
     pi_li = torch.stack(T_arr)
     layer_weights = layer_weights.permute(0,2,1)
-    transported_layer_weights = torch.matmul(layer_weights.cpu(), pi_li)
+    transported_layer_weights = torch.matmul(layer_weights, pi_li)
     global_layer_weights = (torch.sum(transported_layer_weights,axis=0) / len(transported_layer_weights))
 
     return global_layer_weights, pi_li
