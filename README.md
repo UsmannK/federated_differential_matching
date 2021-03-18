@@ -23,6 +23,8 @@ command: `python main.py --logdir logs/cifar_test --dataset cifar10 --datadir da
 
 To use MNIST and MLP change the `--dataset` and `model_type` as per `utils.py`
 
+To use differentiable matching, specify `--diff_match` and `--diff_match_epochs`
+
 ```
 Model 0
 Last 10 retraining epoch losses: ['1.26606', '1.21634', '1.16008', '1.10885', '1.08537', '1.02599', '0.98416', '0.94997', '0.90053', '0.85081']
