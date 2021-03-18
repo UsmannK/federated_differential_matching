@@ -27,6 +27,7 @@ def get_parser():
 
     parser.add_argument('--partition', type=str, required=True, help="Partition = homo/hetero/hetero-dir")
     parser.add_argument('--alpha', type=float, required=False, default=0.5, help="Dirichlet distribution constant used for data partitioning")
+    parser.add_argument('--diff_match', action="store_true", required=False, default=False, help="Use differentiable method")
     parser.add_argument('--diff_match_epochs', type=int, required=False, default=20_000, help="Epochs for differentiable method")
     parser.add_argument('--match_all_layers', action="store_true", help="Match final layers instead of weighted avg")
     parser.add_argument('--skip_bias_match', action="store_true", help="Use weight matrices for bias transformation")
